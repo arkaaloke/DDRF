@@ -21,6 +21,7 @@ class JobQueue:
 		self.elephantStatus = elephantStatus
 		self.fullyRunningJobs = []
 		self.waitList = []
+		self.numRunningTasks = 0
 
 	def getElephantStatus(self):
 		return self.elephantStatus
@@ -76,9 +77,10 @@ class JobQueue:
 		return self.name
 
 	def taskStarted(self, task):
-		self.cpuUsage = task.cpu
-		self.memUsage = task.mem
+		self.cpuUsage += task.cpu
+		self.memUsage += task.mem
 
+		self.numRunningTasks += 1
 		job = task.job
 
 
@@ -97,6 +99,6 @@ class JobQueue:
 	def taskEnded(self, task, time):
 		self.memUsage -= task.mem
 		self.cpuUsage -= task.cpu
-
+		self.numRunningTasks -= 1
 
 		self.numRunningTasks -= 1 

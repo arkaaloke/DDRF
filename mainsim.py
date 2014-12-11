@@ -10,8 +10,17 @@ from CDRF import *
 from sorter import *
 import heapq
 from statlogger import *
-
+import time as tm
 INF = sys.maxint
+
+def tracefunc(frame, event, arg, indent=[0]):
+      if event == "call":
+          indent[0] += 2
+          print tm.time(), "-" * indent[0] + "> call function", frame.f_code.co_name
+      elif event == "return":
+          print tm.time(), "<" + "-" * indent[0], "exit function", frame.f_code.co_name
+          indent[0] -= 2
+      return tracefunc
 
 class Simulator:
 	def __init__(self, cluster, elephantNumTasks):
@@ -78,12 +87,38 @@ class Simulator:
 			return None
 		time =  self.evQueue[0][0]
 		#print "Handling events for time : ", time	
+
+		print "\n\n\n\n\n"
+		print tm.time() , "STARTING HANDLING FOR TIME : ", time 
+		print >> sys.stderr, tm.time()
 		print >> sys.stderr, "Handling events for time : ", time
 		print >> sys.stderr, "Num jobs started : " , self.numElephantStarted + self.numMiceStarted , " (%d, %d) " % (self.numElephantStarted, self.numMiceStarted )
 		print >> sys.stderr, "Num jobs completed : " , self.numJobsCompleted , " (%d, %d) " % (self.numElephantsFinished, self.numMiceFinished )
 		print >> sys.stderr, "Num jobs running : ( %d, %d ) " % ( len(self.elephantQueue.jobs) , len(self.miceQueue.jobs))
 		print >> sys.stderr, "Fully running task jobs : ( %d, %d ) " % ( len(self.elephantQueue.fullyRunningJobs), len(self.miceQueue.fullyRunningJobs) ) 
 		print >> sys.stderr, "Length of waitlist : (%d , %d) " % ( len(self.elephantQueue.waitList) , len(self.miceQueue.waitList) )
+		print >> sys.stderr, "Utilization : elephant : (%.2f, %.2f) , mice : (%.2f, %.2f) " % \
+				(  self.elephantQueue.memUsage , \
+				   self.elephantQueue.cpuUsage , \
+				   self.miceQueue.memUsage  , \
+				   self.miceQueue.cpuUsage )
+		print >> sys.stderr, "Total : elephant : (%.2f, %.2f) , mice : (%.2f, %.2f) " % \
+				(  float(self.cluster.totMem) , \
+				   float(self.cluster.totCpu) , \
+				   float(self.cluster.totMem) , \
+				   float(self.cluster.totCpu) )
+ 
+
+ 
+
+		print >> sys.stderr, " Percent Utilization : elephant : (%.2f, %.2f) , mice : (%.2f, %.2f) " % \
+				(  self.elephantQueue.memUsage / float(self.cluster.totMem) , \
+				   self.elephantQueue.cpuUsage / float(self.cluster.totCpu) , \
+				   self.miceQueue.memUsage / float(self.cluster.totMem) , \
+				   self.miceQueue.cpuUsage / float(self.cluster.totCpu) )
+
+		print >> sys.stderr, " Num Tasks : elephant : (%d) , mice : (%d) " % (self.elephantQueue.numRunningTasks, self.miceQueue.numRunningTasks)
+ 
 		#print >> sys.stderr, "\n"
 		#print >>sys.stderr, "Times : "
 		#for i in range(len(self.evQueue)):
@@ -133,15 +168,15 @@ class Simulator:
 					if j.isElephant() :
 						#print "#2: self.needNewElephantAllocation = True"
 						self.needNewElephantAllocation = True
-						if q.hasWaitlistedJobs():
-							job = q.getWaitlistedJob()
-							if job == None:
-								print "PANIC"
-								exit()
-							if job.start < time:
-								job.start = time
-							heapq.heappush(self.evQueue, (job.start , Event(job.start , "JOB", job)))
-								
+					if q.hasWaitlistedJobs():
+						job = q.getWaitlistedJob()
+						if job == None:
+							print "PANIC"
+							exit()
+						if job.start < time:
+							job.start = time
+						heapq.heappush(self.evQueue, (job.start , Event(job.start , "JOB", job)))
+							
 					
 
 			elif ev.eventType == "JOBDONE":
@@ -281,7 +316,7 @@ class Simulator:
 
 		#setting job threshold for elephants to INFINITY
 		mice_gen = EventGenerator("sorted_jobs-exp-small", sys.maxint, False )   
-		self.miceQueue = DRFQueue("mice", DRFSorter(), 10000000, self.cluster, 50 , mice_gen )
+		self.miceQueue = DRFQueue("mice", DRFSorter(), 10000000, self.cluster, INF , mice_gen )
 
 
 		elephant_gen = EventGenerator("sorted_jobs-exp-small", self.elephantTaskThreshold , True)
@@ -299,6 +334,7 @@ class Simulator:
 			self.allocateDRF(time)
 
 		print "Simulation complete"
+		print "length of event queue : ", len(self.evQueue)
 		self.finish(time)
 
 
@@ -350,7 +386,7 @@ def DRFOnly():
 
 
 	machineConfig = [ general, mem_optimized, cpu_optimized ]
-  	machinesPerType = [ 500 , 500 , 500  ]
+  	machinesPerType = [ 100 , 100 , 100  ]
 	cluster = Cluster(machineConfig, machinesPerType, 3.0 , 5.0 , INF , 1.0 , 0.0 )
 
 	sl = JobFinishLogger("delaysDRF.csv")	
@@ -370,8 +406,8 @@ def DDRF():
 
 
 	machineConfig = [ general, mem_optimized, cpu_optimized ]
-  	machinesPerType = [ 500 , 500 , 500  ]
-	cluster = Cluster(machineConfig, machinesPerType, 3.0 , 5.0 , elephantNumTasks , 0.8 , 0.8 )
+  	machinesPerType = [ 100 , 100 , 100  ]
+	cluster = Cluster(machineConfig, machinesPerType, 3.0 , 5.0 , elephantNumTasks , 0.2 , 0.8 )
 
 	sl = JobFinishLogger("delaysDDRF.csv")	
 	sim = Simulator(cluster , elephantNumTasks)
@@ -383,6 +419,7 @@ def DDRF():
 
 
 if __name__== "__main__":
+	sys.settrace(tracefunc)
 	DDRF()
 	#DRFOnly()
 

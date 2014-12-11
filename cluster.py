@@ -30,6 +30,7 @@ class Cluster:
 				self.totMem += mem
 
 		print "Created : ", len(self.machines) , "machines"
+		print "Tot mem : " , self.totMem, "Tot cpu : ", self.totCpu
 
 	def getJobSizeThreshold(self):
 		return self.jobSizeThreshold

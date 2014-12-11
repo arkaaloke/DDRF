@@ -30,10 +30,12 @@ class StatLogger:
 class JobFinishLogger(StatLogger):
 	def start(self):
 		self.f.write("JOBID, NUMTASKS, MEM, CPU, STARTTIME, ACTUAL STARTTIME, COMPLETION TIME, DELAY\n")
+		self.f.flush()
+
 	def jobDone(self, time, job):
 		line = " %d, %d, %.2f, %.2f, %d, %d, %d, %d \n"
 		self.f.write( line % (job.jobid, job.numTasks, job.mem, job.cpu, job.start, job.actualStartTime, time, time - job.start) )
-
+		self.f.flush()
  	def finish(self, time):
 		self.f.close()
 

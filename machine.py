@@ -3,7 +3,7 @@ import sys
 
 class Machine:
 	stat_id = 0
-	def __init__(self, cpu, mem, minCpu, minMem, cluster, jobSizeThreshold, largeJobThreshold, smallJobThreshold ):
+	def __init__(self, cpu, mem, minCpu, minMem, cluster, jobSizeThreshold, smallJobThreshold, largeJobThreshold ):
 		self.cpu = cpu
 		self.mem = mem
 		self.minCpu = minCpu
@@ -25,6 +25,8 @@ class Machine:
 		self.machineId = Machine.stat_id
 		Machine.stat_id += 1
 		self.tasks = []
+
+		self.tasksByJob = {}
 
 	def __str__(self):
 		return "ID : %s , (%d, %d) " % (self.machineId, self.mem, self.cpu)
@@ -59,6 +61,12 @@ class Machine:
 		task.machine = self
 		self.tasks.append(task)
 
+		jobid = task.job.jobid
+		if jobid not in self.tasksByJob : 
+			self.tasksByJob[jobid] = []
+
+		self.tasksByJob[jobid].append(task)
+
 	def deleteTask(self, task):
 		self.cpuUsage -= task.cpu
 		self.memUsage -= task.mem
@@ -76,13 +84,18 @@ class Machine:
 		task.machine = None
 		self.tasks.remove(task)
 
+		jobid = task.job.jobid
+		self.tasksByJob[jobid].remove(task)
+		if len(self.tasksByJob[jobid]) == 0:
+			del self.tasksByJob[jobid]
+
 	def getMachineId(self):
 		return self.machineId
 
 	def getNumTasksJob(self, jobid):
-		count = 0
-		for t in self.tasks:
-			if t.job.jobid == jobid:
-				count += 1
+		if jobid not in self.tasksByJob :
+			return 0
+		else:
+			return len(self.tasksByJob[jobid])
 
-		return count
+
