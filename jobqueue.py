@@ -21,7 +21,6 @@ class JobQueue:
 		self.elephantStatus = elephantStatus
 		self.fullyRunningJobs = []
 		self.waitList = []
-		self.numRunningTasks = 0
 
 	def getElephantStatus(self):
 		return self.elephantStatus
@@ -33,6 +32,8 @@ class JobQueue:
 		if len(self.waitList) == 0 :
 			print self.name, "queue waitlist empty"
 			j = self.gen.getNextJob()
+			if j==None:
+				return None
 			j.queue = self
 			#print "Read job : ", j
 			if len(self.jobs) >= self.admissionThreshold:
@@ -84,8 +85,7 @@ class JobQueue:
 		job = task.job
 
 
-		self.numRunningTasks += 1
-		if len(job.getReadyTasks()) == 0:
+		if job.allTasksAllocated():
 			self.jobs.remove(job)
 			self.fullyRunningJobs.append(job)
 
@@ -101,4 +101,3 @@ class JobQueue:
 		self.cpuUsage -= task.cpu
 		self.numRunningTasks -= 1
 
-		self.numRunningTasks -= 1 

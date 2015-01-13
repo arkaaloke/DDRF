@@ -15,6 +15,8 @@ class Cluster:
 		self.machineConfig = machineConfig
 		self.machinesPerType = machinesPerType
 
+		self.freeMiceMachines = []
+
 		print "Creating machines "
 		for i in range(len(machinesPerType)):
 			self.numMachines += machinesPerType[i]
@@ -28,6 +30,7 @@ class Cluster:
 				self.machinesByType[i].append(m)
 				self.totCpu += cpu
 				self.totMem += mem
+				self.freeMiceMachines.append(m)
 
 		print "Created : ", len(self.machines) , "machines"
 		print "Tot mem : " , self.totMem, "Tot cpu : ", self.totCpu

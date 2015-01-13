@@ -2,19 +2,29 @@ import os
 import sys
 
 class Task:
-    statid = 0
-    def __init__(self, dur):
-        self.duration = dur
-        self.taskid = statid
+	statid = 0
+	def __init__(self, dur):
+		self.duration = dur
+		#self.taskid = statid
+		self.taskid = 0
+		self.machine = None
 
-    def __init__(self, mem , cpu , dur):
-        self.duration = dur
-        self.cpu = cpu
-        self.mem = mem
+	def __init__(self, mem , cpu , dur):
+		self.duration = dur
+		self.cpu = cpu
+		self.mem = mem
+		self.machine = None
 
-    def setJob(self, job):
-        self.job = job
+	def setJob(self, job):
+		self.job = job
 
-    def __str__(self):
-        return "cpu:%.2f,mem:%.2f === jobid : %d , numtasksremaining: (%d,%d) " %(float(self.cpu), float(self.mem), self.job.jobid, len(self.job.tasksRunning) , len(self.job.tasksReady) )
+	def setTaskId(self, taskid):
+		self.taskid = taskid
+
+	def addMachine(self, m):
+		self.machine = m
+
+	def __str__(self):
+		return "jobid:%d, taskid:%d, machine:%s " %(self.job.jobid, self.taskid, str(self.machine))
+
   

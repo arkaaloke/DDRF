@@ -23,7 +23,7 @@ class EventGenerator:
 			parts = line.split(":")
         		if parts[0].strip() != "j":
             			print " Something wrong with the input file"
-            			exit()
+            			return None
         		starttime = int(parts[1].strip())
         		numtasks = int(parts[2].strip())
 			self.jobid += 1
