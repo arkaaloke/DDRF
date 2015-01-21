@@ -30,7 +30,7 @@ class MiceMachine(BasicMachine):
 
 		if self.mem - self.memUsage < self.minMem or self.cpu - self.cpuUsage < self.minCpu:
 			self.isFree = False
- 			self.cluster.freeMiceMachines[self.machineId] = 1
+ 			self.cluster.freeMiceMachines[self.machineId] = 0
 
 	def deleteTask(self, task):
 		self.cpuUsage -= task.cpu
@@ -48,6 +48,6 @@ class MiceMachine(BasicMachine):
 		if not self.isFree:
 			if self.mem - self.memUsage > self.minMem and self.cpu - self.cpuUsage > self.minCpu:
 				self.isFree = True
-				self.cluster.freeMiceMachines[self.machineId] = 0
+				self.cluster.freeMiceMachines[self.machineId] = 1
 
 			

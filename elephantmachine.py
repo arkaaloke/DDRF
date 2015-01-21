@@ -30,7 +30,7 @@ class ElephantMachine(BasicMachine):
 
 		if self.mem - self.memUsage < self.minMem or self.cpu - self.cpuUsage < self.minCpu:
 			self.isFree = False
- 			self.cluster.freeElephantMachines[self.machineId] = 1
+ 			self.cluster.freeElephantMachines[self.machineId] = 0
 
 
 	def deleteTask(self, task):
@@ -51,6 +51,6 @@ class ElephantMachine(BasicMachine):
 		if not self.isFree:
 			if self.mem - self.memUsage > self.minMem and self.cpu - self.cpuUsage > self.minCpu:
 				self.isFree = True
-				self.cluster.freeElephantMachines[self.machineId] = 0
+				self.cluster.freeElephantMachines[self.machineId] = 1
 
-	
+

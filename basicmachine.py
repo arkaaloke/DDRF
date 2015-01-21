@@ -53,3 +53,6 @@ class BasicMachine:
 			return self.tasksByJob[jobid]
 
 
+	def isMachineFree(self):
+		return self.isFree
+	

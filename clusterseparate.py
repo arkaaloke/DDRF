@@ -16,8 +16,17 @@ class ClusterSeparate:
 		self.totMem = 0
 		self.machineConfig = machineConfig
 		self.machinesPerType = machinesPerType
+		self.elephantMachinesPerType = list(machinesPerType)
+		self.elephantMachineConfig = list(self.machineConfig)
+	
+		# subtract headroom 
+		for i in range(len(self.elephantMachineConfig)) :
+			self.elephantMachineConfig[i][0] -= minMem
+			self.elephantMachineConfig[i][1] -= minCpu
+
+		self.machineType = {}
 		for i in range(len(self.machinesPerType)):
-			self.machinesPerType[i] = machinesPerType[i] - int( miceFraction * machinesPerType[i] )
+			self.elephantMachinesPerType[i] = machinesPerType[i] - int( miceFraction * machinesPerType[i] )
 		self.numMiceMachines = 0
 		self.numElephantMachines = 0
 
@@ -25,12 +34,14 @@ class ClusterSeparate:
 		self.miceMachines = []
 
 		print "Creating machines "
+		print "Number of types of machines : ", machinesPerType
 		for i in range(len(machinesPerType)):
 			self.numMachines += machinesPerType[i]
 			mem = machineConfig[i][0]
 			cpu = machineConfig[i][1]
 			self.elephantMachinesByType[i] = []
 			for j in range( machinesPerType[i] ):
+				print "Number of mice machines : " , float(miceFraction) , float(machinesPerType[i]) , int (float(miceFraction) * float(machinesPerType[i]) ) 
 				if j < int (float(miceFraction) * float(machinesPerType[i]) ):
 					m = MiceMachine(cpu, mem, minCpu, minMem, self , "mice" )
 					self.machines.append(m)
@@ -48,12 +59,13 @@ class ClusterSeparate:
 
 					self.totCpu += cpu
 					self.totMem += mem
+					self.machineType[m] = i
 
 		print "Created : ", len(self.machines) , "machines"
 		print "Tot mem : " , self.totMem, "Tot cpu : ", self.totCpu
 
-		self.freeMiceMachines = numpy.zeros(self.numMiceMachines)
-		self.freeElephantMachines = numpy.zeros(self.numElephantMachines)
+		self.freeMiceMachines = numpy.ones(self.numMiceMachines)
+		self.freeElephantMachines = numpy.ones(self.numElephantMachines)
 
 	def getJobSizeThreshold(self):
 		return self.jobSizeThreshold
@@ -70,4 +82,19 @@ class ClusterSeparate:
 	def getMemUsage(self):
 		return memUsage
 
+	def getMiceMachine(self, index):
+		return self.miceMachines[index]
+
+	def getElephantMachine(self, index):
+		return self.elephantMachines[index]
+
+	def getFreeMiceMachineArray(self):
+		return numpy.nonzero(self.freeMiceMachines)
+
+	def getFreeElephantMachineArray(self):
+		return numpy.nonzero(self.freeElephantMachines)
+
+
+	def getMachineType(self, m):
+		return self.machineType[m]
 

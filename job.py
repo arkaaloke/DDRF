@@ -27,6 +27,7 @@ class Job:
 		self.readyTaskIndex = 0
 		self.numTasksFinished = 0
 		self.numTasksRunning = 0
+		self.domShare = 0.0
 		
 	def isElephant(self):
 		if self.queue.getElephantStatus() == True:
@@ -56,7 +57,7 @@ class Job:
 		#print "ADD TASKS ==== JOBID : ", self.jobid , " NUMBER OF READY TASKS : ", len(self.tasksReady)
 	def getDomShare(self):
 		#print self
-		return max( float(self.cpuUsage) / float(self.totCpu) , float(self.memUsage) / float(self.totMem) )
+		return self.domShare
 
 	def getCpuUsage(self):
 		return self.cpuUsage
@@ -92,13 +93,14 @@ class Job:
 			self.actualStartTime =  time
 
 		self.readyTaskIndex += 1
-		print "Allocated task , ", self.readyTaskIndex, "in job : ", self.jobid
+		#print "Allocated task , ", self.readyTaskIndex, "in job : ", self.jobid
 		#self.tasksReady.remove(task)
 		self.tasksRunning.append(task)
 		self.numTasksRunning += 1
 		self.cpuUsage += task.cpu
 		self.memUsage += task.mem
 
+		self.domShare = max( float(self.cpuUsage) / float(self.totCpu) , float(self.memUsage) / float(self.totMem) )	
 		#print "Job ID : ", self.jobid, "Num Tasks ready:", len(self.tasksReady), "Num tasks running:", len(self.tasksRunning)
 
 	def taskDone(self, task, time):
@@ -107,6 +109,9 @@ class Job:
 		self.memUsage -= task.mem
 		self.numTasksRunning -= 1
 		self.numTasksFinished += 1
+
+		self.domShare = max( float(self.cpuUsage) / float(self.totCpu) , float(self.memUsage) / float(self.totMem) )
+
 		#print "Job ID : ", self.jobid, "Num Tasks ready:", len(self.tasksReady), "Num tasks running:", len(self.tasksRunning)
 
 
@@ -135,3 +140,12 @@ class Job:
 	def __str__(self):
 		return "Job : %d, Num Tasks : %d, Start Time : %d, Queue : %s , Util : (%.2f, %.2f) , NumTasksLeft : %d " % ( self.jobid, self.numTasks, self.start, self.queue.name, self.memUsage, self.cpuUsage, len(self.tasksReady) - self.readyTaskIndex )
 
+	def __cmp__(self, other):
+
+		if not isinstance(other, Job):
+			return 1
+
+		if self.getDomShare() <= other.getDomShare():
+			return -1
+		else:
+			return 1
