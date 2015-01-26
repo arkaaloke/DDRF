@@ -131,7 +131,7 @@ class Job:
 			return False
 
 	def getAllTasksAllocatedStatus(self):
-		if len(self.tasksReady) > 0:
+		if len(self.tasksReady) != self.readyTaskIndex :
 			print "Panic"
 		retValue = self.needNewAllocation
 		self.needNewAllocation = False
@@ -140,12 +140,3 @@ class Job:
 	def __str__(self):
 		return "Job : %d, Num Tasks : %d, Start Time : %d, Queue : %s , Util : (%.2f, %.2f) , NumTasksLeft : %d " % ( self.jobid, self.numTasks, self.start, self.queue.name, self.memUsage, self.cpuUsage, len(self.tasksReady) - self.readyTaskIndex )
 
-	def __cmp__(self, other):
-
-		if not isinstance(other, Job):
-			return 1
-
-		if self.getDomShare() <= other.getDomShare():
-			return -1
-		else:
-			return 1

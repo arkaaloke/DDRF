@@ -2,9 +2,10 @@ import os
 import sys
 
 class StatLogger:
-	def __init__(self, filename):
+	def __init__(self, filename, cluster):
 		self.filename = filename
 		self.f = open(filename, "w")
+		self.cluster = cluster
 
 	def event(self, time, ev):
 		pass
@@ -22,8 +23,9 @@ class StatLogger:
 	def start(self):
 		pass
 	
-	def IterationFinished(self, time):
+	def IterationFinished(self, time, utilStats):
 		pass
+
 	def finish(self, time):
 		pass
 
@@ -38,6 +40,56 @@ class JobFinishLogger(StatLogger):
 		self.f.flush()
  	def finish(self, time):
 		self.f.close()
+
+class UtilizationLogger(StatLogger):
+
+	def start(self):
+		self.num_machine_types = self.cluster.numMachineTypes
+
+		self.f.write("Time, \
+					Overall_util, Overall_cpu, Overall_mem, Overall_num_tasks, \
+					E_overall_util, E_overall_cpu, E_overall_mem, E_overall_num_tasks, \
+					M_overall_util, M_overall_cpu, M_overall_mem, M_overall_num_tasks, ")
+
+		for i in range(self.num_machine_types):
+			self.f.write("E_" + str(i) + "_util, E_" + str(i) + "_cpu, E_" + str(i) + "_mem, E_" + str(i) + "_num_tasks")
+		 
+
+		for i in range(self.num_machine_types):
+			self.f.write("M_" + str(i) + "_util, M_" + str(i) + "_cpu, M_" + str(i) + "_mem, M_" + str(i) + "_num_tasks")
+ 
+		self.f.write("\n")
+		self.f.flush()
+
+	def IterationFinished(self, time, E_stats):
+		line_overall = " %d," \
+					   "%.2f, %.2f, %.2f, %d," \
+					   "%.2f, %.2f, %.2f, %d," \
+					   "%.2f, %.2f, %.2f, %d,"
+ 
+		self.f.write( line_overall % (time , \
+						E_stats["overall"]["util"], E_stats["overall"]["cpu"], E_stats["overall"]["mem"], E_stats["overall"]["num_tasks"], 
+						E_stats["elephants"]["util"] , E_stats["elephants"]["cpu"] ,E_stats["elephants"]["mem"] ,E_stats["elephants"]["num_tasks"] ,
+						E_stats["mice"]["util"] , E_stats["mice"]["cpu"] ,E_stats["mice"]["mem"] ,E_stats["mice"]["num_tasks"] ) )
+
+		for i in range(self.num_machine_types):
+			self.f.write(  str(E_stats[str(i)]["elephants"]["util"]) + "," \
+						 + str(E_stats[str(i)]["elephants"]["cpu"]) +  "," \
+						 + str(E_stats[str(i)]["elephants"]["mem"]) +  "," \
+						 + str(E_stats[str(i)]["elephants"]["num_tasks"]) + "," )
+						
+		for i in range( self.num_machine_types):
+			self.f.write(  str(E_stats[str(i)]["mice"]["util"]) + "," \
+						 + str(E_stats[str(i)]["mice"]["cpu"]) +  "," \
+						 + str(E_stats[str(i)]["mice"]["mem"]) +  "," \
+						 + str(E_stats[str(i)]["mice"]["num_tasks"]) + "," )
+
+		self.f.write("\n") 
+		self.f.flush()
+
+ 	def finish(self, time):
+		self.f.close()
+
 
 class ElephantLogger(StatLogger):
 	def start(self):

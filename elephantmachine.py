@@ -18,6 +18,19 @@ class ElephantMachine(BasicMachine):
 
 		task.machine = self
 		self.tasks += 1
+		
+		self.cluster.utilStats["overall"]["cpu"] += task.cpu
+		self.cluster.utilStats["overall"]["mem"] += task.mem
+		self.cluster.utilStats["overall"]["num_tasks"] += 1
+
+		self.cluster.utilStats["elephants"]["cpu"] += task.cpu
+		self.cluster.utilStats["elephants"]["mem"] += task.mem
+		self.cluster.utilStats["elephants"]["num_tasks"] += 1
+		
+		self.cluster.utilStats[str(self.cluster.getMachineType(self))]["elephants"]["cpu"] += task.cpu
+		self.cluster.utilStats[str(self.cluster.getMachineType(self))]["elephants"]["mem"] += task.mem
+		self.cluster.utilStats[str(self.cluster.getMachineType(self))]["elephants"]["num_tasks"] += 1
+
 
 		jobid = task.job.jobid
 		if jobid not in self.tasksByJob : 
@@ -42,6 +55,20 @@ class ElephantMachine(BasicMachine):
 
 		task.machine = None
 		self.tasks -= 1
+
+		self.cluster.utilStats["overall"]["cpu"] -= task.cpu
+		self.cluster.utilStats["overall"]["mem"] -= task.mem
+		self.cluster.utilStats["overall"]["num_tasks"] -= 1
+
+		self.cluster.utilStats["elephants"]["cpu"] -= task.cpu
+		self.cluster.utilStats["elephants"]["mem"] -= task.mem
+		self.cluster.utilStats["elephants"]["num_tasks"] -= 1
+		
+		self.cluster.utilStats[str(self.cluster.getMachineType(self))]["elephants"]["cpu"] -= task.cpu
+		self.cluster.utilStats[str(self.cluster.getMachineType(self))]["elephants"]["mem"] -= task.mem
+		self.cluster.utilStats[str(self.cluster.getMachineType(self))]["elephants"]["num_tasks"] -= 1
+
+
 
 		jobid = task.job.jobid
 		self.tasksByJob[jobid] -= 1

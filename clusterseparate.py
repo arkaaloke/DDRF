@@ -18,11 +18,12 @@ class ClusterSeparate:
 		self.machinesPerType = machinesPerType
 		self.elephantMachinesPerType = list(machinesPerType)
 		self.elephantMachineConfig = list(self.machineConfig)
+		self.numMachineTypes = len(self.machinesPerType)
 	
 		# subtract headroom 
-		for i in range(len(self.elephantMachineConfig)) :
-			self.elephantMachineConfig[i][0] -= minMem
-			self.elephantMachineConfig[i][1] -= minCpu
+		#for i in range(len(self.elephantMachineConfig)) :
+		#	self.elephantMachineConfig[i][0] -= minMem
+		#	self.elephantMachineConfig[i][1] -= minCpu
 
 		self.machineType = {}
 		for i in range(len(self.machinesPerType)):
@@ -41,7 +42,7 @@ class ClusterSeparate:
 			cpu = machineConfig[i][1]
 			self.elephantMachinesByType[i] = []
 			for j in range( machinesPerType[i] ):
-				print "Number of mice machines : " , float(miceFraction) , float(machinesPerType[i]) , int (float(miceFraction) * float(machinesPerType[i]) ) 
+				#print "Number of mice machines : " , float(miceFraction) , float(machinesPerType[i]) , int (float(miceFraction) * float(machinesPerType[i]) ) 
 				if j < int (float(miceFraction) * float(machinesPerType[i]) ):
 					m = MiceMachine(cpu, mem, minCpu, minMem, self , "mice" )
 					self.machines.append(m)
@@ -50,6 +51,7 @@ class ClusterSeparate:
 
 					self.totCpu += cpu
 					self.totMem += mem
+					self.machineType[m] = i
 				else:
 					m = ElephantMachine(cpu, mem, minCpu, minMem, self , "elephant" )
 					self.machines.append(m)
@@ -63,7 +65,7 @@ class ClusterSeparate:
 
 		print "Created : ", len(self.machines) , "machines"
 		print "Tot mem : " , self.totMem, "Tot cpu : ", self.totCpu
-
+		print "Created : ", self.numMiceMachines, " mice. ", self.numElephantMachines , " elephants . Machines"
 		self.freeMiceMachines = numpy.ones(self.numMiceMachines)
 		self.freeElephantMachines = numpy.ones(self.numElephantMachines)
 
@@ -97,4 +99,28 @@ class ClusterSeparate:
 
 	def getMachineType(self, m):
 		return self.machineType[m]
+
+	def setUtilStats(self, utilStats):
+		self.utilStats = utilStats
+		utilStats["overall"] = {}
+		utilStats["elephants"] = {}
+		utilStats["mice"] = {}
+
+		for key in utilStats:
+			utilStats[key]["util"] = 0
+			utilStats[key]["mem"] = 0
+			utilStats[key]["cpu"] = 0
+			utilStats[key]["num_tasks"] = 0
+
+		for i in range(self.numMachineTypes):
+			utilStats[str(i)] = {}
+			utilStats[str(i)]["elephants"] = {}
+			utilStats[str(i)]["mice"] = {}
+
+			for key in utilStats[str(i)]:
+				utilStats[str(i)][key]["util"] = 0
+				utilStats[str(i)][key]["mem"] = 0
+				utilStats[str(i)][key]["cpu"] = 0
+				utilStats[str(i)][key]["num_tasks"] = 0
+
 

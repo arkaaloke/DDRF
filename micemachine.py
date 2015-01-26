@@ -15,9 +15,23 @@ class MiceMachine(BasicMachine):
 		self.cluster.cpuUsage += task.cpu
 		self.cluster.memUsage += task.mem
 
-
 		task.machine = self
 		self.tasks += 1
+
+		#print self.cluster.utilStats
+
+		self.cluster.utilStats["overall"]["cpu"] += task.cpu
+		self.cluster.utilStats["overall"]["mem"] += task.mem
+		self.cluster.utilStats["overall"]["num_tasks"] += 1
+
+		self.cluster.utilStats["mice"]["cpu"] += task.cpu
+		self.cluster.utilStats["mice"]["mem"] += task.mem
+		self.cluster.utilStats["mice"]["num_tasks"] += 1
+		
+		#print "machine type : ", str(self.cluster.getMachineType(self))
+		self.cluster.utilStats[str(self.cluster.getMachineType(self))]["mice"]["cpu"] += task.cpu
+		self.cluster.utilStats[str(self.cluster.getMachineType(self))]["mice"]["mem"] += task.mem
+		self.cluster.utilStats[str(self.cluster.getMachineType(self))]["mice"]["num_tasks"] += 1
 
 		jobid = task.job.jobid
 		if jobid not in self.tasksByJob : 
@@ -41,7 +55,20 @@ class MiceMachine(BasicMachine):
 
 		task.machine = None
 		self.tasks -= 1
-	
+		
+		self.cluster.utilStats["overall"]["cpu"] -= task.cpu
+		self.cluster.utilStats["overall"]["mem"] -= task.mem
+		self.cluster.utilStats["overall"]["num_tasks"] -= 1
+
+		self.cluster.utilStats["mice"]["cpu"] -= task.cpu
+		self.cluster.utilStats["mice"]["mem"] -= task.mem
+		self.cluster.utilStats["mice"]["num_tasks"] -= 1
+		
+		self.cluster.utilStats[str(self.cluster.getMachineType(self))]["mice"]["cpu"] -= task.cpu
+		self.cluster.utilStats[str(self.cluster.getMachineType(self))]["mice"]["mem"] -= task.mem
+		self.cluster.utilStats[str(self.cluster.getMachineType(self))]["mice"]["num_tasks"] -= 1
+
+
 		jobid = task.job.jobid
 		self.tasksByJob[jobid] -= 1
 
