@@ -27,7 +27,6 @@ class BasicMachine:
 		self.tasks = 0
 
 		self.tasksByJob = {}
-		self.machineType = jobType
 		
 		self.isFree = True
 
@@ -53,8 +52,6 @@ class BasicMachine:
 		else:
 			return self.tasksByJob[jobid]
 
-	def getMachineType(self):
-		return self.machineType
 
 	def isMachineFree(self):
 		return self.isFree

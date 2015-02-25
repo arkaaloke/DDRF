@@ -23,11 +23,57 @@ class StatLogger:
 	def start(self):
 		pass
 	
-	def IterationFinished(self, time, utilStats):
+	def IterationFinished(self, time, utilStats=None):
 		pass
 
 	def finish(self, time):
 		pass
+
+class MachineUtilLogger(StatLogger):
+	def start(self):
+	 	for i in range(self.cluster.numMachines):
+			self.f.write("Time, Total_" + str(i) + "_util, Total_" + str(i) + "_cpu, Total_" + str(i) + "_mem,")
+		 
+	   	for i in range(self.cluster.numMachines):
+			self.f.write("E_" + str(i) + "_util, E_" + str(i) + "_cpu, E_" + str(i) + "_mem,")
+		 
+
+		for i in range(self.cluster.numMachines):
+			self.f.write("M_" + str(i) + "_util, M_" + str(i) + "_cpu, M_" + str(i) + "_mem,")
+ 
+		self.f.write("\n")
+		self.f.flush()
+
+
+	def IterationFinished(self,time, param=None):
+
+		self.f.write(str(time) + "," )
+		for i in range(self.cluster.numMachines):
+			
+			self.f.write(  str( max( self.cluster.machines[i].cpuUsage / self.cluster.machines[i].cpu , self.cluster.machines[i].memUsage / self.cluster.machines[i].mem) ) + "," \
+						 + str( self.cluster.machines[i].cpuUsage ) +  "," \
+						 + str( self.cluster.machines[i].memUsage ) +  "," )
+			
+		for i in range(self.cluster.numMachines):
+			
+			self.f.write(  str( max( self.cluster.machines[i].elephantCpuUsage / self.cluster.machines[i].cpu , self.cluster.machines[i].elephantMemUsage / self.cluster.machines[i].mem) ) + "," \
+						 + str( self.cluster.machines[i].elephantCpuUsage ) +  "," \
+						 + str( self.cluster.machines[i].elephantMemUsage ) +  "," )
+				
+		for i in range(self.cluster.numMachines):
+			
+			self.f.write(  str( max( self.cluster.machines[i].miceCpuUsage / self.cluster.machines[i].cpu , self.cluster.machines[i].miceMemUsage / self.cluster.machines[i].mem) ) + "," \
+						 + str( self.cluster.machines[i].miceCpuUsage ) +  "," \
+						 + str( self.cluster.machines[i].miceMemUsage ) +  "," )
+									
+
+		self.f.write("\n") 
+		self.f.flush()
+
+	
+ 	def finish(self, time):
+		self.f.close()
+
 
 class JobFinishLogger(StatLogger):
 	def start(self):
@@ -61,7 +107,7 @@ class UtilizationLogger(StatLogger):
 		self.f.write("\n")
 		self.f.flush()
 
-	def IterationFinished(self, time, E_stats):
+	def IterationFinished(self, time, E_stats=None):
 		line_overall = " %d," \
 					   "%.2f, %.2f, %.2f, %d," \
 					   "%.2f, %.2f, %.2f, %d," \

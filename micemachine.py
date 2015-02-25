@@ -18,8 +18,6 @@ class MiceMachine(BasicMachine):
 		task.machine = self
 		self.tasks += 1
 
-		#print self.cluster.utilStats
-
 		self.cluster.utilStats["overall"]["cpu"] += task.cpu
 		self.cluster.utilStats["overall"]["mem"] += task.mem
 		self.cluster.utilStats["overall"]["num_tasks"] += 1
@@ -28,7 +26,6 @@ class MiceMachine(BasicMachine):
 		self.cluster.utilStats["mice"]["mem"] += task.mem
 		self.cluster.utilStats["mice"]["num_tasks"] += 1
 		
-		#print "machine type : ", str(self.cluster.getMachineType(self))
 		self.cluster.utilStats[str(self.cluster.getMachineType(self))]["mice"]["cpu"] += task.cpu
 		self.cluster.utilStats[str(self.cluster.getMachineType(self))]["mice"]["mem"] += task.mem
 		self.cluster.utilStats[str(self.cluster.getMachineType(self))]["mice"]["num_tasks"] += 1

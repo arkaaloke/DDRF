@@ -61,13 +61,6 @@ class JobQueue:
 		return self.cpuUsage
 
 	def addJob(self, job):
-		#job.setClusterParams(self.cluster.totCpu, self.cluster.totMem)
-		#print "QUEUE : CLUSTER PARAMS : ", self.cluster.totCpu, self.cluster.totMem  
-		#heapq.heappush(self.jobs, job)
-		#print "Length of jobs queue : ", len(self.jobs)	
-		#self.hasReadyTasks = True
-		#self.numTasks += job.numTasks
-		#print "Added Job : ", job, "to queue : ", self.name
 		pass
 
 	def jobCompleted(self, job):
@@ -82,22 +75,6 @@ class JobQueue:
 		return self.name
 
 	def taskStarted(self, task):
-		#self.cpuUsage += task.cpu
-		#self.memUsage += task.mem
-
-		#self.numRunningTasks += 1
-		#job = task.job
-
-
-		#if job.allTasksAllocated():
-		#	print "Removing job because all tasks are allocated " , job
-		#	self.jobs.remove(job)
-		#	self.fullyRunningJobs.append(job)
-		#else:
-		#	print "removing job to repush into heap ", job
-		#	print "length of jobs queue : ", len(self.jobs)
-		#	self.jobs.remove(job)
-		#	heapq.heappush(self.jobs, job)
 		pass
 
 	def hasWaitlistedJobs(self):
@@ -108,14 +85,6 @@ class JobQueue:
 			return False
 
 	def taskEnded(self, task, time):
-		#self.memUsage -= task.mem
-		#self.cpuUsage -= task.cpu
-		#self.numRunningTasks -= 1
-		#job = task.job
-
-		#if job in self.jobs:
-		#	self.jobs.remove(job)
-		#	heapq.heappush(self.jobs, job)
 		pass
 
 

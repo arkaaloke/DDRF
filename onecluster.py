@@ -1,10 +1,9 @@
 import os
 import sys
-from micemachine import *
-from elephantmachine import *
 import numpy
+from combinedmachine import *
 
-class ClusterSeparate:
+class OneCluster:
 
 	def __init__(self, machineConfig, machinesPerType, minCpu, minMem, miceFraction ):
 		self.numMachines = 0
@@ -19,20 +18,11 @@ class ClusterSeparate:
 		self.elephantMachinesPerType = list(machinesPerType)
 		self.elephantMachineConfig = list(self.machineConfig)
 		self.numMachineTypes = len(self.machinesPerType)
+		self.numMachines = 0
 	
-		# subtract headroom 
-		#for i in range(len(self.elephantMachineConfig)) :
-		#	self.elephantMachineConfig[i][0] -= minMem
-		#	self.elephantMachineConfig[i][1] -= minCpu
-
 		self.machineType = {}
 		for i in range(len(self.machinesPerType)):
-			self.elephantMachinesPerType[i] = machinesPerType[i] - int( miceFraction * machinesPerType[i] )
-		self.numMiceMachines = 0
-		self.numElephantMachines = 0
-
-		self.elephantMachines = []
-		self.miceMachines = []
+			self.elephantMachinesPerType[i] = machinesPerType[i]
 
 		print "Creating machines "
 		print "Number of types of machines : ", machinesPerType
@@ -42,32 +32,20 @@ class ClusterSeparate:
 			cpu = machineConfig[i][1]
 			self.elephantMachinesByType[i] = []
 			for j in range( machinesPerType[i] ):
-				print "Number of mice machines : " , float(miceFraction) , float(machinesPerType[i]) , int (float(miceFraction) * float(machinesPerType[i]) ) 
-				if j < int (float(miceFraction) * float(machinesPerType[i]) ):
-					m = MiceMachine(cpu, mem, minCpu, minMem, self , "mice" )
-					self.machines.append(m)
-					self.miceMachines.append(m)
-					self.numMiceMachines += 1
+				m = CombinedMachine(cpu, mem, minCpu, minMem, self , miceFraction )
+				self.machines.append(m)
+				self.elephantMachinesByType[i].append(m)
 
-					self.totCpu += cpu
-					self.totMem += mem
-					self.machineType[m] = i
-				else:
-					m = ElephantMachine(cpu, mem, minCpu, minMem, self , "elephant" )
-					self.machines.append(m)
-					self.elephantMachinesByType[i].append(m)
-					self.elephantMachines.append(m)
-					self.numElephantMachines += 1
-
-					self.totCpu += cpu
-					self.totMem += mem
-					self.machineType[m] = i
+				self.totCpu += cpu
+				self.totMem += mem
+				self.machineType[m] = i
 
 		print "Created : ", len(self.machines) , "machines"
 		print "Tot mem : " , self.totMem, "Tot cpu : ", self.totCpu
 
-		self.freeMiceMachines = numpy.ones(self.numMiceMachines)
-		self.freeElephantMachines = numpy.ones(self.numElephantMachines)
+		self.freeMiceMachines = numpy.ones(self.numMachines)
+		self.freeElephantMachines = numpy.ones(self.numMachines)
+		self.freeMachines = numpy.ones(self.numMachines)
 
 	def getJobSizeThreshold(self):
 		return self.jobSizeThreshold
@@ -84,11 +62,11 @@ class ClusterSeparate:
 	def getMemUsage(self):
 		return memUsage
 
-	def getMiceMachine(self, index):
-		return self.miceMachines[index]
+	def getMachine(self, index):
+		return self.machines[index]
 
-	def getElephantMachine(self, index):
-		return self.elephantMachines[index]
+	#def getElephantMachine(self, index):
+	#	return self.elephantMachines[index]
 
 	def getFreeMiceMachineArray(self):
 		return numpy.nonzero(self.freeMiceMachines)
@@ -96,6 +74,9 @@ class ClusterSeparate:
 	def getFreeElephantMachineArray(self):
 		return numpy.nonzero(self.freeElephantMachines)
 
+
+	def getFreeMachineArray(self):
+		return numpy.nonzero(self.freeMachines)
 
 	def getMachineType(self, m):
 		return self.machineType[m]

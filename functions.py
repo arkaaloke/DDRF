@@ -25,7 +25,7 @@ def isFeasible(machines,players,z):
     else:
         return False
 
-def cdrfFind(machines,players,ks,machinesPerType):
+def cdrfFind(machines,players,ks,machinesPerType,requests):
 
         numberOfPlayers = shape(players)[0]
         numberOfResources = shape(players)[1]
@@ -65,6 +65,8 @@ def cdrfFind(machines,players,ks,machinesPerType):
                 expr.add( machinesPerType[0][j] * x[j*numberOfPlayers + i] )
 
             m.addConstr(expr, GRB.EQUAL, a * ks[i] , "d" + `i`)
+            if requests.any():
+                m.addConstr(expr, GRB.LESS_EQUAL, requests[i] , "f" + `i`)
 
 
 

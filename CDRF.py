@@ -21,7 +21,7 @@ def allocateLeftoverMachines(players, al_types, m , z, cdrf ):
     return argmax(z[:,worse])
 
 
-def computeCDRF(machines,players,machinesPerType,c,flag):
+def computeCDRF(smart_rounding,machines,players,machinesPerType,c,flag, requests = array([])):
 
     numberOfMachineTypes = machines.shape[0]
     numberOfPlayers = players.shape[0]
@@ -53,7 +53,7 @@ def computeCDRF(machines,players,machinesPerType,c,flag):
     ks = sum(sa, axis=0)
 
     #Find CDRF on the LP relaxation
-    [a,allocation] = functions.cdrfFind(machines,players,ks,machinesPerType)
+    [a,allocation] = functions.cdrfFind(machines,players,ks,machinesPerType, requests)
 
     #print "al = " , `allocation`
     #print "a = " , `a`
@@ -65,7 +65,7 @@ def computeCDRF(machines,players,machinesPerType,c,flag):
     try:
         for j in range(0,numberOfMachineTypes):
 
-                    #print "machine " + `j`
+                    print "machine " + `j`
                     CDRF_m = allocation[ j*numberOfPlayers : (j+1)*numberOfPlayers ]
                     cdrfIndividual[j] = CDRF_m
 
@@ -94,8 +94,13 @@ def computeCDRF(machines,players,machinesPerType,c,flag):
                     z = vstack( ( z, zeros(numberOfPlayers) ) )
                     lambdas = append(lambdas, 0)
 
+                    print z
                     #Round z down
-                    z_imp = Rounding.improveWorst(players,machines[j],z,lambdas,CDRF_m)
+                    if smart_rounding:
+                        z_imp = Rounding.improveWorst(players,machines[j],z,lambdas,CDRF_m)
+                    else:
+                        z_imp = Rounding.trivialRounding(z)
+                    print z_imp
 
                     #remove row of zeros
                     z = delete( z , -1 , 0 )
@@ -111,36 +116,37 @@ def computeCDRF(machines,players,machinesPerType,c,flag):
 
                     #test solution
                     if not allclose( dot(lambdas,z) , CDRF_m ):
-                        #print "lambdas are wrong!"
-                        #print "players = " + `players`
-                        #print "machine = " + `machines`
+                        print "lambdas are wrong!"
+                        print "players = " + `players`
+                        print "machine = " + `machines`
                         sys.exit()
 
                     if ( lambdas > 1 + 1e-10).any():
-                        #print "lambdas greater than 1 " + `sum(lambdas)`
-                        #print "lambdas > 1: " + `lambdas>1`
-                        #print "players = " + `players`
-                        #print "machine = " + `machines[j]`
+                        print "lambdas greater than 1 " + `sum(lambdas)`
+                        print "lambdas > 1: " + `lambdas>1`
+                        print "players = " + `players`
+                        print "machine = " + `machines[j]`
                         sys.exit()
 
                     if (lambdas < -1e-10).any():
-                        #print "lambdas smaller than 0"
-                        #print "lambdas = " + `lambdas`
-                        #print "players = " + `players`
-                        #print "machines = " + `machines`
+                        print "lambdas smaller than 0"
+                        print "lambdas = " + `lambdas`
+                        print "players = " + `players`
+                        print "machines = " + `machines`
                         sys.exit()
 
                     if (abs(sum(lambdas) - 1) > 1e-10):
-                        #print "lambdas don't add up to 1"
-                        #print "players = " + `players`
-                        #print "machines = " + `machines`
+                        print "lambdas don't add up to 1"
+                        print "players = " + `players`
+                        print "machines = " + `machines`
+                        print "sum = ", sum(lambdas)
                         sys.exit()
 
     except Exception as ex:
-        #print "Error! " + `ex`
+        print "Error! " + `ex`
         traceback.print_exc(file=sys.stdout)
-        #print "players = " + `players`
-        #print "machines = " + `machines`
+        print "players = " + `players`
+        print "machines = " + `machines`
         sys.exit()
 
     m = sum(machinesPerType)
@@ -197,7 +203,7 @@ def computeCDRF(machines,players,machinesPerType,c,flag):
                 allocation = hstack( ( allocation, S[j][t] ) )
 
 
-    #print " XXX allocation = " , allocation
+    #print "allocation = " , allocation
 
     return allocation
 

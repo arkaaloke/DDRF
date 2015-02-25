@@ -9,11 +9,15 @@ def findCornersAndCoefficients(machine,players,cdrf,tight,x,seed):
     E = tight
     Ep = array([[]])
 
-    a = findCorners(machine,players,x,seed,E,Ep)
+    #a = findCorners(machine,players,x,seed,E,Ep)
+    a = findCornersAlternative(machine,players,x,seed,E,Ep)
+    #print "alt ", a
+
+    if len(a.shape) == 1:
+        a = [a]
 
     if allclose(a,cdrf):
         return [ a , 1]
-
 
     try:
         lambdas = linalg.solve(transpose(a),cdrf)
@@ -36,6 +40,8 @@ def findCornersAndCoefficients(machine,players,cdrf,tight,x,seed):
             print "Wrong solution found"
             print "players = " + `players`
             print "machine = " + `machine`
+            print "lamdbas dot a " , dot(lambdas,a)
+            print "cdrf " , cdrf
             sys.exit()
 
 
@@ -48,6 +54,8 @@ def findCorners(machine,players,x,seed,E,Ep):
 
         #find corners
         a = CO(machine,players,E,Ep,seed)
+
+        #print "aaassasfs "
 
         if allclose(x,a):
             return a
@@ -67,21 +75,65 @@ def findCorners(machine,players,x,seed,E,Ep):
         except Exception as e:
             t = 0
 
+
         z = x + t*(x-a)
 
-
-        #z = dot(1 + D,x) - dot(D,a)
-        #print "new z is feasible: " + `functions.isFeasible(machine,players,z)`
-        #print "new a: " + `a`
-
-
-        E_new = argwhere( abs(dot( transpose(players) , z ) - machine) < 1e-8 )
+        E_new = argwhere( abs(dot( transpose(players) , z ) - machine) < 1e-10 )
         Ep_new = argwhere( abs(z) < 1e-8 )
         E = append(E, E_new )
         Ep = append(Ep , Ep_new )
 
+        #print "E " , E
+        #print "Ep " , Ep
+
         a = vstack( (a, findCorners(machine,players,z,seed,E,Ep) ) )
+
         return a
+
+
+
+def findCornersAlternative(machine,players,x,seed,E,Ep):
+
+        n = shape(players)[0]
+        c = 0
+
+        #find corners
+        a = CO(machine,players,E,Ep,seed)
+        out = a
+
+        while not allclose(x,a):
+
+                #print "here ", a
+
+                #D = findD(machine,players,x,a)
+                A = vstack( [transpose(players) , -diag(ones(n))] )
+                b = hstack( [ machine , zeros(n) ] )
+                Au = dot( A, (x-a) )
+                b_ = b - dot( A, x )
+                positive = argwhere( Au > 1e-10 )
+                numbers = divide( b_[positive]  , Au[positive] )
+                #print numbers
+
+                try:
+                    t = min( abs(numbers) )
+                except Exception as e:
+                    t = 0
+
+
+                z = x + t*(x-a)
+
+                E_new = argwhere( abs(dot( transpose(players) , z ) - machine) < 1e-10 )
+                Ep_new = argwhere( abs(z) < 1e-8 )
+                E = append(E, E_new )
+                Ep = append(Ep , Ep_new )
+
+                x = z
+
+                #a = vstack( (a, findCorners(machine,players,z,seed,E,Ep) ) )
+                a = CO(machine,players,E,Ep,seed)
+                out = vstack( (out, a ) )
+
+        return out
 
 
 def CO(machine,players,E,Ep,seed):
