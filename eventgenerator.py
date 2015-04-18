@@ -21,11 +21,11 @@ class EventGenerator:
 		while True:
 			line = self.file.readline().strip()
 			parts = line.split(":")
-        		if parts[0].strip() != "j":
-            			print " Something wrong with the input file"
-            			return None
-        		starttime = int(parts[1].strip())
-        		numtasks = int(parts[2].strip())
+			if parts[0].strip() != "j":
+					print " Something wrong with the input file"
+					return None
+			starttime = int(parts[1].strip())
+			numtasks = int(parts[2].strip())
 			self.jobid += 1
 
 			if self.elephantFlag == True:
@@ -47,17 +47,17 @@ class EventGenerator:
 		tasks = []
 		memArray = []
 		cpuArray = []
-        	for i in range(numtasks):
+		for i in range(numtasks):
 			line = self.file.readline() 
-		    	parts = line.strip().split(":")
-		    	if parts[0].strip() != "t":
+			parts = line.strip().split(":")
+			if parts[0].strip() != "t":
 				exit()
-		    	mem = int(parts[3].strip())
-		    	cpu = float(parts[2]) / float(parts[1])
-		    	duration = int(float(parts[1]) / 1000)
+			mem = int(parts[3].strip())
+			cpu = float(parts[2]) / float(parts[1])
+			duration = int(float(parts[1]) / 1000)
 
-		    	t = Task(mem, cpu, duration)
-		    	tasks.append(t)
+			t = Task(mem, cpu, duration)
+			tasks.append(t)
 
 			memArray.append(mem)
 			cpuArray.append(cpu)
@@ -65,6 +65,7 @@ class EventGenerator:
 		avg_mem = numpy.mean(memArray) / (1024 * 1024 *1024)
 		avg_cpu = numpy.mean(cpuArray)
 
+		print "READ JOB : " , avg_mem , avg_cpu
 		for t in tasks:
 			t.mem = avg_mem
 			t.cpu = avg_cpu

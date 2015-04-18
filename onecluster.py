@@ -32,7 +32,7 @@ class OneCluster:
 			cpu = machineConfig[i][1]
 			self.elephantMachinesByType[i] = []
 			for j in range( machinesPerType[i] ):
-				m = CombinedMachine(cpu, mem, minCpu, minMem, self , miceFraction )
+				m = CombinedMachine(cpu, mem, minCpu, minMem, self , 1.0 )
 				self.machines.append(m)
 				self.elephantMachinesByType[i].append(m)
 

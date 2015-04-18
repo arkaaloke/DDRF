@@ -25,6 +25,9 @@ class Task:
 		self.machine = m
 
 	def __str__(self):
-		return "jobid:%d, taskid:%d, machine:%s " %(self.job.jobid, self.taskid, str(self.machine))
+		if self.machine != None:
+			return "jobid:%d, taskid:%d, duration:%d machinid:%d (mem,cpu):(%.2f,%.2f)" %(self.job.jobid, self.taskid, self.duration, self.machine.machineId, self.mem, self.cpu)
+		else:
+			return "jobid:%d, taskid:%d, duration:%d machinid:%s (mem,cpu):(%.2f,%.2f)" %(self.job.jobid, self.taskid, self.duration, "None" , self.mem, self.cpu)
 
   

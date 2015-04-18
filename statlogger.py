@@ -3,9 +3,11 @@ import sys
 
 class StatLogger:
 	def __init__(self, filename, cluster):
+		
 		self.filename = filename
-		self.f = open(filename, "w")
 		self.cluster = cluster
+		if filename != None:
+			self.f = open(filename, "w")
 
 	def event(self, time, ev):
 		pass
@@ -31,8 +33,9 @@ class StatLogger:
 
 class MachineUtilLogger(StatLogger):
 	def start(self):
+		self.f.write("Time,")
 	 	for i in range(self.cluster.numMachines):
-			self.f.write("Time, Total_" + str(i) + "_util, Total_" + str(i) + "_cpu, Total_" + str(i) + "_mem,")
+			self.f.write("Total_" + str(i) + "_util, Total_" + str(i) + "_cpu, Total_" + str(i) + "_mem,")
 		 
 	   	for i in range(self.cluster.numMachines):
 			self.f.write("E_" + str(i) + "_util, E_" + str(i) + "_cpu, E_" + str(i) + "_mem,")
@@ -74,6 +77,34 @@ class MachineUtilLogger(StatLogger):
  	def finish(self, time):
 		self.f.close()
 
+
+class JobFairnessLogger(StatLogger):
+	def __init__(self, filename, cluster, sim):
+		
+		self.filename = filename
+		self.cluster = cluster
+		self.sim = sim
+
+	def IterationFinished(self,time, param=None):
+
+		print "FAIRNESS : ", time ,	
+		try: 
+			for job in self.sim.miceQueue.jobs:
+				print "(%d, %.2f, %d, %s) ," % (job.jobid, job.getDomShare(), job.numTasksRunning, str(job.allTasksAllocated()) ) ,
+		except:
+			print
+		try:
+			for job in self.sim.elephantQueue.jobs:
+				print "(%d, %.2f, %d, %d, %s) ," % (job.jobid, job.getDomShare(), job.numTasksRunning, self.sim.perJobAllocation[job.jobid], str(job.allTasksAllocated()) ) ,
+		except:
+			print
+
+		try:
+			for job in self.sim.elephantQueue.fullyRunningJobs:
+				print "(%d, %.2f, %d, %d, %s) ," % (job.jobid, job.getDomShare(), job.numTasksRunning, self.sim.perJobAllocation[job.jobid], str(job.allTasksAllocated()) ) ,
+		except:
+			print
+		print 
 
 class JobFinishLogger(StatLogger):
 	def start(self):

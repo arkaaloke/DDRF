@@ -12,6 +12,7 @@ import heapq
 from statlogger import *
 import time as tm
 import signal
+import random
 
 INF = sys.maxint
 
@@ -32,6 +33,7 @@ def tracefunc(frame, event, arg, indent=[0]):
 class Simulator:
 	def __init__(self, cluster, elephantNumTasks):
 		self.cluster = cluster
+		self.preemptedTasks = []
 		self.evQueue = []
 		self.numStartedJobs = 0
 		self.maxJobs = sys.maxint
@@ -48,10 +50,17 @@ class Simulator:
 		self.lastIterationTime = tm.time()
 		self.stopTime = sys.maxint
 		self.utilStats = {}
-		cluster.setUtilStats(self.utilStats)
+		self.cluster.setUtilStats(self.utilStats)
 		self.taskdoneElephantMachines = []
 		self.numTasksFinishedInterval = 0
 		self.simulationTime = None
+		self.perJobAllocation = {}
+		self.miceQueueMachines = []
+		self.numTasksQueued = 0
+		self.medianElephantShare = 0.0
+		# HACK !!!!
+		for i in range(0, 300):
+			self.perJobAllocation[i] = 0
 
 	def setStopTime(self, stopTime):
 		self.stopTime = stopTime
@@ -59,28 +68,32 @@ class Simulator:
 	def setMaxJobs(self, maxJobs):
 		self.maxJobs = maxJobs
 
-
 	def getCurrentElephants(self):
 		if len(self.elephantQueue.jobs) == 0:
-			return None
+			return [ None , None ]
 		print "NUMBER OF PLAYERS : ", len(self.elephantQueue.jobs)
 		players = numpy.zeros((len(self.elephantQueue.jobs) , 2))	
+		requests = numpy.zeros( len(self.elephantQueue.jobs) )
+
 		for i in range(len(self.elephantQueue.jobs)):
 			#print "PLAYER : ", self.elephantQueue.jobs[i] 
 			job = self.elephantQueue.jobs[i]
 			players[i,0] = job.mem
 			players[i,1] = job.cpu
+			requests[i] = job.getNumTasksRemaining()
+			#requests.append( job.getNumTasksRemaining() )
+ 
+		#return ( players, requests ) 
+		return [ players , requests ]
 
-		return players
-	
 	def elephantAllocation(self, time):
 		if self.needNewElephantAllocation == False:
 			if len(self.elephantQueue.jobs) == 0:
 				return None
 			else:
 				return self.allocation
-		players = self.getCurrentElephants()
-		#print "Players : " , players
+		[ players , requests ]  = self.getCurrentElephants()
+		print "Players : " , players , "Requests : ", requests
 		if players == None:
 			return None
 
@@ -89,14 +102,33 @@ class Simulator:
 		self.numTasksFinishedInterval = 0
 		start = tm.time()
 
-		alloc = computeCDRF(0, numpy.array(self.cluster.elephantMachineConfig), numpy.array(players) , [ numpy.array(self.cluster.elephantMachinesPerType) ], 1, 0)
+		#print "Calling CDRF with " , numpy.array(self.cluster.elephantMachineConfig), numpy.array(players) , [ numpy.array(self.cluster.elephantMachinesPerType) ] , requests 
+		alloc = computeCDRF(1, numpy.array(self.cluster.elephantMachineConfig), numpy.array(players) , [ numpy.array(self.cluster.elephantMachinesPerType) ], 1, 0 )
 		self.numLPInvocations += 1
 		self.allocation = {}
-		for i in range(len(self.elephantQueue.jobs)):
-			jobid = self.elephantQueue.jobs[i].jobid
-			self.allocation[jobid] = {}
-			for j in range(len(self.cluster.elephantMachineConfig)):
-				self.allocation[jobid][j] = alloc[ i* len(self.cluster.machines) + j*len(self.cluster.elephantMachinesByType[j]) ]
+		for i in range(len(self.cluster.machines)):
+				for j in range(len(self.elephantQueue.jobs)):
+					jobid = self.elephantQueue.jobs[j].jobid
+					if jobid not in self.allocation:
+						self.allocation[jobid] = {}
+					self.allocation[jobid][ self.cluster.getMachine(i) ] =  alloc[ i * len(self.elephantQueue.jobs) + j ] 
+
+		for job in self.allocation:
+			self.perJobAllocation[job] = 0
+			for m in self.allocation[job]:
+				self.perJobAllocation[job] += self.allocation[job][m]
+
+
+		#print "FAIRNESS", time, str(alloc)
+		#print "FAIRNESS", time 
+		#for job in sorted(self.allocation):
+		#	for machine in sorted(self.allocation[job]):
+		#		print "FAIRNESS", time, job, self.cluster.getMachineType(machine), self.cluster.machines.index(machine), self.allocation[job][machine] 
+
+		for i in range(len(numpy.array(players))):
+			print "p" + str(i) + " : " + str(players[i]) , 
+
+		print
 		end = tm.time()
 		print "Simulation Time : %s, CDRF LP allocation %d took %.2f sec, num players : %d " % (str(self.simulationTime), self.numLPInvocations, end - start, len(self.elephantQueue.jobs) )
 
@@ -124,6 +156,8 @@ class Simulator:
 		print >> sys.stderr, "Num jobs started : " , self.numElephantStarted + self.numMiceStarted , " (%d, %d) " % (self.numElephantStarted, self.numMiceStarted )
 		print >> sys.stderr, "Num jobs completed : " , self.numJobsCompleted , " (%d, %d) " % (self.numElephantsFinished, self.numMiceFinished )
 		print self.numJobsCompleted , " (%d, %d) " % (self.numElephantsFinished, self.numMiceFinished )
+		print >> sys.stderr, "Num tasks queue : %d " % (self.numTasksQueued)
+		print time, ", Num tasks queue : %d " % (self.numTasksQueued)
 		#print >> sys.stderr, "Num jobs running : ( %d, %d ) " % ( len(self.elephantQueue.jobs) , len(self.miceQueue.jobs))
 		#print >> sys.stderr, "Fully running task jobs : ( %d, %d ) " % ( len(self.elephantQueue.fullyRunningJobs), len(self.miceQueue.fullyRunningJobs) ) 
 		#print >> sys.stderr, "Length of waitlist : (%d , %d) " % ( len(self.elephantQueue.waitList) , len(self.miceQueue.waitList) )
@@ -132,20 +166,22 @@ class Simulator:
 		#		   self.elephantQueue.cpuUsage , \
 		#		   self.miceQueue.memUsage  , \
 		#		   self.miceQueue.cpuUsage )
-		#print >> sys.stderr, "Total : elephant : (%.2f, %.2f) , mice : (%.2f, %.2f) " % \
-		#		(  float(self.cluster.totMem) , \
-		#		   float(self.cluster.totCpu) , \
-		#		   float(self.cluster.totMem) , \
-		#		   float(self.cluster.totCpu) )
+		print >> sys.stderr, "Total : Utilization : (%.2f) " % max(self.cluster.cpuUsage / self.cluster.totCpu , self.cluster.memUsage / self.cluster.totMem ) 
+		print  time,";Total : Utilization : (%.2f) " % max(self.cluster.cpuUsage / self.cluster.totCpu , self.cluster.memUsage / self.cluster.totMem )
  
 
- 
+		print >> sys.stderr, " Percent Utilization : elephant : (%.2f, %.2f) , mice : (%.2f, %.2f) " % \
+				(  self.elephantQueue.memUsage / float(self.cluster.totMem) , \
+				   self.elephantQueue.cpuUsage / float(self.cluster.totCpu) , \
+				   self.miceQueue.memUsage / float(self.cluster.totMem) , \
+				   self.miceQueue.cpuUsage / float(self.cluster.totCpu) )
 
-		#print >> sys.stderr, " Percent Utilization : elephant : (%.2f, %.2f) , mice : (%.2f, %.2f) " % \
-		#		(  self.elephantQueue.memUsage / float(self.cluster.totMem) , \
-		#		   self.elephantQueue.cpuUsage / float(self.cluster.totCpu) , \
-		#		   self.miceQueue.memUsage / float(self.cluster.totMem) , \
-		#		   self.miceQueue.cpuUsage / float(self.cluster.totCpu) )
+		print " Percent Utilization : elephant : (%.2f, %.2f) , mice : (%.2f, %.2f) " % \
+				(  self.elephantQueue.memUsage / float(self.cluster.totMem) , \
+				   self.elephantQueue.cpuUsage / float(self.cluster.totCpu) , \
+				   self.miceQueue.memUsage / float(self.cluster.totMem) , \
+				   self.miceQueue.cpuUsage / float(self.cluster.totCpu) )
+
 
 		#print >> sys.stderr, " Num Tasks : elephant : (%d) , mice : (%d) " % (self.elephantQueue.numRunningTasks, self.miceQueue.numRunningTasks)
 		print >> sys.stderr, " Num LP invocations : %s " % (self.numLPInvocations)
@@ -187,19 +223,24 @@ class Simulator:
 						#print >> sys.stderr, "Pushed ", j.start
 
 			elif ev.eventType == "TASKDONE":
+				if (time, ev) in self.preemptedTasks:
+					print "Ignoring preempted taskdone"
+					self.preemptedTasks.remove((time, ev))
+					continue
+
 				t = ev.data
 				j = t.job
 				#print "Printing all tasks for job : ", j
 				#for tk in j.getReadyTasks():
 				#	print tk
 
-				#print "Finished task : ", j , t, time, t.machine
+				print "Finished task : ", j , t, time, t.machine
 				j.taskDone(t, time)
 				machine = t.machine
 				if j.isElephant():
 					self.taskdoneElephantMachines.append(machine)
 
-				machine.deleteTask(t)
+				machine.deleteTask(t, time)
 				q = j.getQueue()
 				q.taskEnded(t, time)
 				for s in self.statLoggers:
@@ -269,151 +310,156 @@ class Simulator:
 
 		return time
 
-	def allocateMiceDRF(self, time):
+	def allocateMiceDDRF(self, time):
 		start = tm.time()
 		allocated = True
 		queue = self.miceQueue
 
-	   	while allocated == True:
+		completelyFull = numpy.zeros(self.cluster.numMachineTypes)
+		while allocated == True:
 			allocated = False
 			if len(queue.jobs) == 0:
-				print "allocateMiceDRF no jobs in queue"
+				print "allocateMiceDDRF no jobs in queue"
 				break
-
-			freeMachines = self.cluster.getFreeMiceMachineArray() 
-			if len(freeMachines[0]) == 0:
-				#print "allocateMiceDRF no free machines"
-				#print freeMachines
-				#for i in range(self.cluster.numMachines):
-				#	print i , self.cluster.machines[i].cpuUsage , self.cluster.machines[i].memUsage ,
-				#print
-				break
-
-
-			m = self.cluster.getMachine(freeMachines[0][0])
-			if not m.isMachineFree():
-				continue
 
 			job = queue.getJob()
+			if job == None:
+				break
+			if job.getDomShare() > self.medianElephantShare and self.medianElephantShare != 0.0 : 
+				break
 			t = job.getReadyTask()
-					
-			allocated = True
-			m.addTask(t)
+			print "Task next to run : ", t , t.mem, t.cpu
+
+			free_mice_machines = self.cluster.getFreeMiceMachineArray()[0]
+			if len(free_mice_machines) == 0:
+				break
+
+			free_machines = self.cluster.getFreeMachineArray()[0]
+			machineNum = None
+			if len(free_machines) > 0:
+				machineNum = free_machines[ random.randint(0, len(free_machines) - 1 ) ]
+			else:
+				machineNum = free_mice_machines[ random.randint(0, len(free_mice_machines) - 1) ]
+
+		   	if machineNum == None:
+				print "PANIC. machineNum is None"
+	 
+			print "machineNum : ", machineNum, t.mem, t.cpu
+			m = self.cluster.getMachine(machineNum)
+
+			while not m.canAddTask(t, "elephant") :
+				taskToKill = m.elephantTaskList[random.randint(0, len(m.elephantTaskList) - 1 )]
+				
+				m.deleteTask(taskToKill, time, "Preempted")
+				j = taskToKill.job
+				j.taskPreempted(taskToKill, time)
+				ev = j.getTaskDoneEvent( taskToKill )
+				q = j.getQueue()
+				q.taskEnded(taskToKill, time)
+				self.evQueue.remove(ev)
+				self.preemptedTasks.append(ev)
+
+
+			m.addTask(t, time, "miceDDRF")
 			job.markAsRunning(t, time)  
 			queue.taskStarted(t)
-			heapq.heappush( self.evQueue, (time + t.duration , Event(time + t.duration, "TASKDONE", t)))
+			ev = (time + t.duration , Event(time + t.duration, "TASKDONE", t))
+			job.addTaskDoneEvent(t, ev) 
+			heapq.heappush( self.evQueue, ev )
+			allocated = True
 			#print "Added Task : ", job, t , "end time : " , time + t.duration
 			if t.machine == None:	
-				print "Machine is NONE : ", t.machine
+				print "PANIC. Machine is NONE : ", t.machine
 				break
-		finish = tm.time()
-		print "Time taken : allocateMiceDRF(%d) : \t\t %.2f" %(time, finish-start)
 
+		finish = tm.time()
+		print "Time taken : allocateMiceDDRF(%d) : \t\t %.2f" %(time, finish-start)
+		heapq.heapify(self.evQueue)
 
 	def allocateUnfinishedElephantDRF(self, time):
 		start = tm.time()
 		allocated = True
 		queue = self.elephantQueue
 
-		freeMachines = self.cluster.getFreeElephantMachineArray() 
-		if len(freeMachines[0]) == 0:
-			return
-
-		for i in range(len(freeMachines[0])):
-			m = self.cluster.getMachine(freeMachines[0][i])
-			if not m.isMachineFree():
-				continue
-
+			
+		while allocated == True:
+			allocated = False
 			if len(queue.jobs) == 0:
+				print "allocateMiceDDRF no jobs in queue"
 				break
 
 			job = queue.getJob()
 			if job == None:
 				break
 			t = job.getReadyTask()
-			if not m.canAddTask(t, "elephant"):
-				continue				
+			print "Task next to run : ", t , t.mem, t.cpu
 
-			m.addTask(t)
+			all_free_elephant_machines = self.cluster.getFreeMachineArray()[0]
+			if len(all_free_elephant_machines) == 0:
+				break
+		
+			machineNum = all_free_elephant_machines[ random.randint( 0, len(all_free_elephant_machines) - 1 ) ]
+			if machineNum == None:
+				print "PANIC. machineNum is NONE "
+			print "machineNum : ", machineNum, t.mem, t.cpu
+			m = self.cluster.getMachine(machineNum)
+
+			m.addTask(t, time, "elephantUnfinishedDDRF")
 			job.markAsRunning(t, time)  
 			queue.taskStarted(t)
-			heapq.heappush( self.evQueue, (time + t.duration , Event(time + t.duration, "TASKDONE", t)))
-			if not job.hasTasksReady():
-				print "LP -> midway DRF elephant allocation . job has run out of tasks", job.jobid , "at time : ", time
-				self.needNewElephantAllocation = True
-
+			ev = (time + t.duration , Event(time + t.duration, "TASKDONE", t))
+			job.addTaskDoneEvent(t, ev) 
+			heapq.heappush( self.evQueue, ev )
+			allocated = True
+			#print "Added Task : ", job, t , "end time : " , time + t.duration
 			if t.machine == None:	
 				print "PANIC. Machine is NONE : ", t.machine
 				break
 
-
 		finish = tm.time()
 		print "Time taken : allocateUnfinishedElephantDRF(%d) : \t\t %.2f" %(time, finish-start)
 
-	def allocateElephantDRFPareto(self, time):
-		start = tm.time()
-
-		allocated = True
-	   	while allocated == True:
-			allocated = False
-			if len(self.elephantQueue.jobs) == 0:
-				break
-
-			freeMachines = self.cluster.getFreeMachineArray()
- 			if len(freeMachines[0]) == 0:
-				break
-
-		
-			m = self.cluster.getMachine(freeMachines[0][0])
-
-
-			job = self.elephantQueue.getJob()
-			t = job.getReadyTask()
-			allocated = True
-			m.addTask(t)
-			job.markAsRunning(t, time)  
-			self.elephantQueue.taskStarted(t)
-			heapq.heappush( self.evQueue, (time + t.duration , Event(time + t.duration, "TASKDONE", t)))
-			if not job.hasTasksReady():
-				print "LP -> Pareto elephant allocation . job has run out of tasks" , job.jobid , "at time : ", time
-				self.needNewElephantAllocation = True
-
- 
-			if t.machine == None:	
-				print "PANIC . Machine is NONE : ", t.machine
-				break
-		finish = tm.time()
-		print "Time taken : allocateElephantDRFPareto(%d) : \t\t %.2f" %(time, finish-start)
-
 	def allocateMiceDRFPareto(self, time):
 		start = tm.time()
-
 		allocated = True
-	   	while allocated == True:
+		queue = self.miceQueue
+
+			
+		while allocated == True:
 			allocated = False
-			if len(self.miceQueue.jobs) == 0:
+			if len(queue.jobs) == 0:
+				print "allocateMiceDDRF no jobs in queue"
 				break
 
-			freeMachines = self.cluster.getFreeMachineArray()
- 			if len(freeMachines[0]) == 0:
+			job = queue.getJob()
+			if job == None:
 				break
-
-		
-			m = self.cluster.getMachine(freeMachines[0][0])
-
-
-			job = self.miceQueue.getJob()
 			t = job.getReadyTask()
-			allocated = True
-			m.addTask(t)
-			job.markAsRunning(t, time)  
-			self.miceQueue.taskStarted(t)
-			heapq.heappush( self.evQueue, (time + t.duration , Event(time + t.duration, "TASKDONE", t)))
+			print "Task next to run : ", t , t.mem, t.cpu
 
- 
-			if t.machine == None:	
-				print "PANIC . Machine is NONE : ", t.machine
+			all_free_elephant_machines = self.cluster.getFreeMachineArray()[0]
+			if len(all_free_elephant_machines) == 0:
 				break
+		
+			machineNum = all_free_elephant_machines[ random.randint( 0, len(all_free_elephant_machines) - 1 ) ]
+			if machineNum == None:
+				print "PANIC. machineNum is NONE "
+	 
+			print "machineNum : ", machineNum, t.mem, t.cpu
+			m = self.cluster.getMachine(machineNum)
+
+			m.addTask(t, time, "miceParetoDDRF")
+			job.markAsRunning(t, time)  
+			queue.taskStarted(t)
+			ev = (time + t.duration , Event(time + t.duration, "TASKDONE", t))
+			job.addTaskDoneEvent(t, ev) 
+			heapq.heappush( self.evQueue, ev )
+			allocated = True
+			#print "Added Task : ", job, t , "end time : " , time + t.duration
+			if t.machine == None:	
+				print "PANIC. Machine is NONE : ", t.machine
+				break
+
 		finish = tm.time()
 		print "Time taken : allocateMiceDRFPareto(%d) : \t\t %.2f" %(time, finish-start)
 
@@ -438,10 +484,12 @@ class Simulator:
 			start = tm.time()
 			for i in range(self.cluster.numMachines):
 				m = self.cluster.getMachine(i)
-				if not m.isMachineFree():
+				if len(m.miceJobQueue) > 0:
 					continue
+				#if not m.isMachineFree():
+				#	continue
 
-				for elephant in alloc:
+				for elephant in sorted(alloc, key=lambda k:self.elephantQueue.getJobById(k).getDomShare()):
 					job = self.elephantQueue.getJobById(elephant)
 
 					if job in self.elephantQueue.fullyRunningJobs :
@@ -454,7 +502,7 @@ class Simulator:
 
 					machineType = self.cluster.getMachineType(m)
 
-					numTasks = alloc[elephant][machineType]
+					numTasks = alloc[elephant][m]
 					numTasksAlreadyRunning = m.getNumTasksJob(elephant)
 					if numTasksAlreadyRunning >= numTasks:
 						continue
@@ -466,10 +514,18 @@ class Simulator:
 						
 						t = job.getReadyTask()
 						if m.canAddTask(t , "elephant" ):
-							m.addTask(t)
+							m.addTask(t, time, "DDRF" )
 							job.markAsRunning(t, time)
 							self.elephantQueue.taskStarted(t)
-							heapq.heappush(self.evQueue, (time + t.duration, Event(time + t.duration, "TASKDONE", t)))
+							ev = (time + t.duration , Event(time + t.duration, "TASKDONE", t))
+							job.addTaskDoneEvent(t, ev)
+
+							heapq.heappush( self.evQueue, ev)
+
+
+							if job.numTasksRunning > self.perJobAllocation[job.jobid]:
+								print "MORETHANREQUIRED - time : %d, jobid : %d, numTasksRunning : %d, LP allocation : %d, numTasksOnMachine LP : %d, numTasksAlreadyRunning ; %d, machineId : %d " % (time, job.jobid, job.numTasksRunning, int(self.perJobAllocation[job.jobid]), numTasks, numTasksAlreadyRunning, m.machineId )
+
 							if t.machine == None:
 								print "Machine of ", t, "is None"
 							for s in self.statLoggers:
@@ -492,10 +548,13 @@ class Simulator:
 			print "Partial machine allocation. Num task done machines :  ", len(self.taskdoneElephantMachines)
 			start = tm.time()
 			for m in self.taskdoneElephantMachines:
-				if not m.isMachineFree():
+				if len(m.miceJobQueue) > 0:
 					continue
 
-				for elephant in alloc:
+				#if not m.isMachineFree():
+				#	continue
+
+				for elephant in sorted(alloc, key=lambda k:self.elephantQueue.getJobById(k).getDomShare()):
 					job = self.elephantQueue.getJobById(elephant)
 					if job in self.elephantQueue.fullyRunningJobs :
 						print "PANIC. job in fully running jobs "
@@ -505,7 +564,7 @@ class Simulator:
 					if not m.canAddTask(t, "elephant"):
 						continue
 					machineType = self.cluster.getMachineType(m)
-					numTasks = alloc[elephant][machineType]
+					numTasks = alloc[elephant][m]
 					numTasksAlreadyRunning = m.getNumTasksJob(elephant)
 					if numTasksAlreadyRunning >= numTasks:
 						continue
@@ -519,10 +578,18 @@ class Simulator:
 						
 						t = job.getReadyTask()
 						if m.canAddTask(t , "elephant"):
-							m.addTask(t)
+							m.addTask(t, time, "DDRF" )
 							job.markAsRunning(t, time)
 							self.elephantQueue.taskStarted(t)
-							heapq.heappush(self.evQueue, (time + t.duration, Event(time + t.duration, "TASKDONE", t)))
+							ev = (time + t.duration , Event(time + t.duration, "TASKDONE", t))
+							job.addTaskDoneEvent(t, ev)
+
+							heapq.heappush( self.evQueue, ev)
+
+
+							if job.numTasksRunning > self.perJobAllocation[job.jobid]:
+								print "MORETHANREQUIRED - time : %d, jobid : %d, numTasksRunning : %d, LP allocation : %d, numTasksOnMachine LP : %d, numTasksAlreadyRunning ; %d, machineId : %d " % (time, job.jobid, job.numTasksRunning, int(self.perJobAllocation[job.jobid]), numTasks, numTasksAlreadyRunning, m.machineId )
+
 							if t.machine == None:
 								print "PANIC : Machine of ", t, "is None"
 							for s in self.statLoggers:
@@ -595,10 +662,13 @@ class Simulator:
 
 		time = None
 		flag = False
+		print "Starting simulator"
+		print "queue size : ", len(self.evQueue) , "time : ", time, "self.stopTime : ", self.stopTime
+
 		while not (len(self.evQueue) == 0 or self.numJobsCompleted > self.maxJobs or time > self.stopTime ):
 			time = self.handleEvents()
-
-			# needNewElephantAllocation because an elephant ran out of tasks midway
+			print "queue size : ", len(self.evQueue) , "time : ", time, "self.stopTime : ", self.stopTime
+			self.allocateMiceDDRF(time)
 			if time == None:
 				break
 			flag = self.allocateElephants(time)
@@ -611,13 +681,13 @@ class Simulator:
 				print "LP -> ran without exhausting elephants :" , time
 				self.needNewElephantAllocation = False
 
-			self.allocateMiceDRF(time)
-			self.allocateElephantDRFPareto(time)
+			#self.allocateElephantDRFPareto(time)
 			self.allocateMiceDRFPareto(time)
 
 			for s in self.statLoggers:
 					s.IterationFinished(time, self.utilStats)
 
+			self.medianElephantShare = self.elephantQueue.getMedianDominantShare()
 
 		print "Simulation complete"
 		self.finish(time)
@@ -628,10 +698,8 @@ class Simulator:
 		for s in self.statLoggers:
 			s.start()
 
-
 		mice_gen = EventGenerator( jobfile , self.elephantTaskThreshold, False )
 		self.miceQueue = DRFQueue("mice", DRFSorter(), 10000000, self.cluster, miceQueueSize , mice_gen )
-
 
 		elephant_gen = EventGenerator( jobfile , self.elephantTaskThreshold , True)
 		self.elephantQueue = DRFQueue("elephant", None, 10000000, self.cluster, elephantQueueSize , elephant_gen , True )
@@ -660,13 +728,13 @@ class Simulator:
 		print "Simulation complete"
 		self.finish(time)
 
-
 	def finish(self, time):
 		for sl in self.statLoggers:
 			sl.finish(time)
 
 	def addStatLogger(self, sl):
 		self.statLoggers.append(sl)
+
 
 def start_exp(exp_type, machine_types, fraction_mice_servers, elephant_num_tasks_threshold):
 
@@ -676,44 +744,47 @@ def start_exp(exp_type, machine_types, fraction_mice_servers, elephant_num_tasks
 	######		  constants		 ###########
 	#############################################
 
-	general = [ 30.0 , 30.0 ]
+	general = [ 12.0 , 12.0 ]
 	mem_optimized = [ 30.0 , 8.0 ]
 	cpu_optimized = [ 16 , 30.0 ]
 
-	jobfile = "sorted_jobs-exp"
+	memHeadroom = 3.0
+	cpuHeadroom = 3.0
 
-	stopTime = 3000
+	jobfile = "toy_input"
 
+	#stopTime = 20000
+	maxJobs = 20000
 	#############################################	
 	######	 end  constants		 ###########
 	#############################################
 
 	startTime = tm.time()
-
-
+	tot_machines = 1200
+	
 	print "Creating machines"
 
 	if machine_types == "G":
 		mahcineConfig = [ general ]
-		machinesPerType  = [ 600 ]
+		machinesPerType  = [ tot_machines ]
 	elif machine_types == "M":
 		machineConfig = [ mem_optimized ]
-		machinesPerType = [ 600 ]
+		machinesPerType = [ tot_machines ]
 	elif machine_types == "C":
 		machineConfig = [ cpu_optimized ]
-		machinesPerType = [ 600 ]
+		machinesPerType = [ tot_machines ]
 	elif machine_types == "G-M" :
 		machineConfig = [ general , mem_optimized ]
-		machinesPerType = [ 300 , 300 ]
+		machinesPerType = [ tot_machines/2 , tot_machines/2 ]
 	elif machine_types == "G-C" :
 		machineConfig = [ general, cpu_optimized ]
-		machinesPerType = [ 300, 300 ]
+		machinesPerType = [ tot_machines/2 , tot_machines/2 ]
 	elif machine_types == "M-C" :
 		machineConfig = [ mem_optimized , cpu_optimized ]
-		machinesPerType = [ 300, 300 ]
+		machinesPerType = [ tot_machines/2 , tot_machines/2 ]
 	elif machine_types == "G-M-C" :
 		machineConfig = [ general, mem_optimized, cpu_optimized ]
-		machinesPerType = [ 200, 200, 200 ]
+		machinesPerType = [ tot_machines/3 , tot_machines/3 , tot_machines/3 ]
 
 	print "Created machines"
 
@@ -722,15 +793,19 @@ def start_exp(exp_type, machine_types, fraction_mice_servers, elephant_num_tasks
 	print "Starting simulation"
 
 	if exp_type == "drf":
-		cluster = OneCluster(machineConfig, machinesPerType, 3.5 , 2.5 , 1.0 )
+		cluster = OneCluster(machineConfig, machinesPerType, cpuHeadroom , memHeadroom , 1.0 )
 		sim = Simulator( cluster, sys.maxint )
 		sim.setStopTime( stopTime )
+		#sim.setMaxJobs( maxJobs )
 
 		sl = JobFinishLogger(logfile + ".finish.csv", cluster)	
 		sim.addStatLogger(sl)
 
 		ul = UtilizationLogger(logfile + ".util.csv", cluster)
 		sim.addStatLogger(ul)
+
+		jfl = JobFairnessLogger(None, cluster, sim)
+		sim.addStatLogger(jfl)
 
 		#ml = MachineUtilLogger(logfile + ".machines.csv" , cluster)
 		#sim.addStatLogger(ml)
@@ -738,15 +813,21 @@ def start_exp(exp_type, machine_types, fraction_mice_servers, elephant_num_tasks
 		sim.DRF(jobfile, sys.maxint )
 
 	elif exp_type == "ddrf":
-		cluster = OneCluster(machineConfig, machinesPerType, 3.5 , 2.5 , fraction_mice_servers )
+		cluster = OneCluster(machineConfig, machinesPerType, cpuHeadroom , memHeadroom , fraction_mice_servers )
 		sim = Simulator( cluster, elephant_num_tasks_threshold )
-		sim.setStopTime( stopTime )
+		#sim.setStopTime( stopTime )
+		sim.setMaxJobs( maxJobs )
+
 
 		sl = JobFinishLogger(logfile + ".finish.csv", cluster)	
 		sim.addStatLogger(sl)
 
 		ul = UtilizationLogger(logfile + ".util.csv", cluster)
 		sim.addStatLogger(ul)
+
+		jfl = JobFairnessLogger(None, cluster, sim)
+		sim.addStatLogger(jfl)
+
 
 		#ml = MachineUtilLogger(logfile + ".machines.csv" , cluster)
 		#sim.addStatLogger(ml)
@@ -754,15 +835,21 @@ def start_exp(exp_type, machine_types, fraction_mice_servers, elephant_num_tasks
 		sim.DDRF( jobfile, sys.maxint, sys.maxint )
 
 	elif exp_type == "drf_twice":
-		cluster = OneCluster(machineConfig, machinesPerType, 3.5 , 2.5 , fraction_mice_servers )
+		cluster = OneCluster(machineConfig, machinesPerType, cpuHeadroom , memHeadroom , fraction_mice_servers )
 		sim = Simulator( cluster, elephant_num_tasks_threshold )
-		sim.setStopTime( stopTime )
+		#sim.setStopTime( stopTime )
+		sim.setMaxJobs( maxJobs )
+
 
 		sl = JobFinishLogger(logfile + ".finish.csv", cluster)	
 		sim.addStatLogger(sl)
 
 		ul = UtilizationLogger(logfile + ".util.csv", cluster)
 		sim.addStatLogger(ul)
+
+		jfl = JobFairnessLogger(None, cluster, sim)
+		sim.addStatLogger(jfl)
+
 
 		#ml = MachineUtilLogger(logfile + ".machines.csv" , cluster)
 		#sim.addStatLogger(ml)
@@ -778,7 +865,7 @@ def start_exp(exp_type, machine_types, fraction_mice_servers, elephant_num_tasks
 if __name__== "__main__":
 	#sys.settrace(tracefunc)
 	
-	signal.signal(signal.SIGINT, signal_handler)
+	#signal.signal(signal.SIGINT, signal_handler)
 	if len(sys.argv) < 4:
 		print "Usage python mainsim.py < <exp_type>  <machine_types> <fraction_mice_servers> <elephant_num_tasks_threshold> "
 		exit()

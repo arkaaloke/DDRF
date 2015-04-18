@@ -82,7 +82,7 @@ class Machine:
 		task.machine = self
 		self.tasks += 1
 
-		#print "MACHINE === Adding task : ", task, "to machine : ", self
+		print "MACHINE === Adding task : ", task, "to machine : ", self
 		jobid = task.job.jobid
 		if jobid not in self.tasksByJob : 
 			self.tasksByJob[jobid] = 0

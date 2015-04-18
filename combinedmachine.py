@@ -30,16 +30,16 @@ class CombinedMachine():
 		self.tasksByJob = {}
 		
 		self.isFree = True
+		self.miceJobQueue = []
+
+		self.elephantTaskList = []
 
 	def canAddTask(self, task, jobType=None):
-		if not self.isFree:
-			return False
-
 		if jobType == None:
 			return self.isFree
 
 		elif jobType == "elephant":
-			if self.elephantMemUsage + task.mem <= self.mem * ( 1 - self.miceFraction ) and self.elephantCpuUsage + task.cpu <= self.cpu * ( 1 - self.miceFraction ):
+			if self.memUsage + task.mem <= self.mem and self.cpuUsage + task.cpu <= self.cpu :
 				return True
 			else:
 				return False
@@ -49,7 +49,7 @@ class CombinedMachine():
 			else:
 				return True
 
-	def addTask(self, task):
+	def addTask(self, task, time=None, taskType=None):
 		self.cpuUsage += task.cpu
 		self.memUsage += task.mem
 
@@ -58,7 +58,10 @@ class CombinedMachine():
 
 		task.machine = self
 		self.tasks += 1
-		
+		if task.job.isElephant(): 
+			self.elephantTaskList.append(task)
+	
+		print "ADDED TASK : Time = ", time, "Type =", taskType, "Added Task = ", task , "; Job = " , task.job , "; Machine	=", self
 		self.cluster.utilStats["overall"]["cpu"] += task.cpu
 		self.cluster.utilStats["overall"]["mem"] += task.mem
 		self.cluster.utilStats["overall"]["num_tasks"] += 1
@@ -98,25 +101,27 @@ class CombinedMachine():
 
 		if self.cluster.freeElephantMachines[self.machineId] == 1:
 			# not fit for elephants
-			if self.elephantMemUsage >= ( 1 - self.miceFraction) * self.mem or self.elephantCpuUsage >= ( 1 - self.miceFraction ) * self.cpu:
+			if self.elephantMemUsage >= self.mem or self.elephantCpuUsage >= self.cpu:
 				self.cluster.freeElephantMachines[self.machineId] = 0
-
+				print "Machine : ", self.machineId, " elephant full : (%.2f, %.2f) , TOTAL : (%.2f, %.2f) " % (self.elephantMemUsage, self.elephantCpuUsage, self.mem, self.cpu)
 
 		if self.cluster.freeMiceMachines[self.machineId] == 1:
 			# not fit for mice anymore
-			if self.miceMemUsage + self.minMem >= (self.miceFraction * self.mem) or self.miceCpuUsage + self.minCpu >= ( self.miceFraction * self.cpu) :
+			if self.miceMemUsage + self.minMem > self.mem or self.miceCpuUsage + self.minCpu > self.cpu :
 				#print "CHANGING MICE MACHINE STATE for machine : " , self.machineId , 
 				#print self.miceMemUsage , self.minMem , self.miceFraction , self.mem , self.miceCpuUsage, self.minCpu , self.miceFraction , self.cpu
 				self.cluster.freeMiceMachines[self.machineId] = 0
+				print "Machine : ", self.machineId, " mice full : (%.2f, %.2f)  , TOTAL : (%.2f, %.2f)  " % (self.miceMemUsage, self.miceCpuUsage , self.mem, self.cpu )
 
 
 		if self.cluster.freeMachines[self.machineId] == 1:
 			# if overall machine is overloaded
-			if self.memUsage + self.minMem >= self.mem or self.cpuUsage + self.minCpu >= self.cpu:
+			if self.memUsage + self.minMem > self.mem or self.cpuUsage + self.minCpu > self.cpu:
 				self.isFree = False
 				self.cluster.freeMachines[self.machineId] = 0
+				print "Machine : ", self.machineId, " total full : (%.2f, %.2f)  , TOTAL : (%.2f, %.2f)  " % (self.memUsage, self.cpuUsage, self.mem, self.cpu)
 
-	def deleteTask(self, task):
+	def deleteTask(self, task, time, deletionType="Normal" ):
 		self.cpuUsage -= task.cpu
 		self.memUsage -= task.mem
 
@@ -125,6 +130,13 @@ class CombinedMachine():
 
 		task.machine = None
 		self.tasks -= 1
+		if task.job.isElephant():
+			self.elephantTaskList.remove(task)
+
+		print "REMOVED TASK : Time = ", time, "Deleted Task = ", task , "; Job = " , task.job , "; Machine	=", self , "Deletion Type =", deletionType
+
+		if deletionType != "Normal" and not task.job.isElephant() :
+			print "PANIC. Preempting Mice"
 
 		self.cluster.utilStats["overall"]["cpu"] -= task.cpu
 		self.cluster.utilStats["overall"]["mem"] -= task.mem
@@ -158,25 +170,32 @@ class CombinedMachine():
 
 		if self.cluster.freeElephantMachines[self.machineId] == 0:
 			# not fit for elephants
-			if self.elephantMemUsage < ( 1 - self.miceFraction) * self.mem and self.elephantCpuUsage < ( 1 - self.miceFraction ) * self.cpu:
+			if self.elephantMemUsage < self.mem and self.elephantCpuUsage < self.cpu:
 				self.cluster.freeElephantMachines[self.machineId] = 1
-
+				print "Machine : ", self.machineId, " elephant free : (%.2f, %.2f)  , TOTAL : (%.2f, %.2f)  " % (self.elephantMemUsage, self.elephantCpuUsage , self.mem, self.cpu )
 
 		if self.cluster.freeMiceMachines[self.machineId] == 0:
 			# not fit for mice anymore
-			if self.miceMemUsage + self.minMem < (self.miceFraction * self.mem) and self.miceCpuUsage + self.minCpu < ( self.miceFraction * self.cpu) :
+			if self.miceMemUsage + self.minMem <= self.mem and self.miceCpuUsage + self.minCpu <= self.cpu :
 				self.cluster.freeMiceMachines[self.machineId] = 1
+				print "Machine : ", self.machineId, " mice free : (%.2f, %.2f)  , TOTAL : (%.2f, %.2f)  " % (self.miceMemUsage, self.miceCpuUsage , self.mem, self.cpu )			 
 
 
 		if self.cluster.freeMachines[self.machineId] == 0:
 			# if overall machine is overloaded
-			if self.memUsage + self.minMem < self.mem and self.cpuUsage + self.minCpu < self.cpu:
+			if self.memUsage + self.minMem <= self.mem and self.cpuUsage + self.minCpu <= self.cpu:
 				self.isFree = True
 				self.cluster.freeMachines[self.machineId] = 1
-
+				print "Machine : ", self.machineId, " total free : (%.2f, %.2f)  , TOTAL : (%.2f, %.2f) " % (self.memUsage, self.cpuUsage , self.mem, self.cpu )
 
 	def getMachineId(self):
 		return self.machineId
+
+	def canFitMice(self, task):
+		if task.mem <= self.mem - self.miceMemUsage and task.cpu <= self.cpu - self.miceCpuUsage:
+			return True
+		else:
+			return False
 
 	def getNumTasksJob(self, jobid):
 		if jobid not in self.tasksByJob :
@@ -184,7 +203,19 @@ class CombinedMachine():
 		else:
 			return self.tasksByJob[jobid]
 
+	def queueMiceJob(self, job, task, time):
+		print "TASK QUEUED : Time = ", time, "Added Task = ", task , "; Job = " , task.job , "; Machine	=", self 
+		self.miceJobQueue.append((job,task))
+
+	def dequeueMiceJob(self, job, t):
+		self.miceJobQueue.remove((job,t))
 
 	def isMachineFree(self):
 		return self.isFree
-	
+
+	def __str__(self):
+		return "machine id: %d total used : (%.2f, %.2f)  , TOTAL : (%.2f, %.2f) " % (self.machineId, self.memUsage, self.cpuUsage , self.mem, self.cpu )
+ 
+
+
+

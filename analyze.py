@@ -28,6 +28,8 @@ def compare(drffilename, ddrffilename):
 		drf_jobs[jobid]["finish time"] = int(line.split(",")[6].strip())
 		drf_jobs[jobid]["completion time"] = drf_jobs[jobid]["finish time"] - drf_jobs[jobid]["start time"]
 		drf_jobs[jobid]["numtasks"] = int(line.split(",")[1].strip())
+		drf_jobs[jobid]["mem"] = float(line.split(",")[2].strip())
+		drf_jobs[jobid]["cpu"] = float(line.split(",")[3].strip())
 
 	for line in ddrf_lines[1:]:
 		jobid = line.split(",")[0].strip()
@@ -40,10 +42,10 @@ def compare(drffilename, ddrffilename):
 	#print "Read output files"	   
 	buckets = []
 
-	#for line in bucket_lines:
-	#	buckets.append(int(line.strip()))
+	for line in bucket_lines:
+		buckets.append(int(line.strip()))
 
-	buckets.append( int(drffilename.strip().split(".")[-3].strip()) )
+	#buckets.append( int(drffilename.strip().split(".")[-3].strip()) )
 	buckets.append(1000000)
 
 	#print buckets
@@ -57,10 +59,12 @@ def compare(drffilename, ddrffilename):
 		num_jobs_completed_drf[bucket] = 0
 		num_jobs_completed_ddrf[bucket] = 0
 
-	for jobid in ddrf_jobs:
+	for jobid in sorted(ddrf_jobs , key=lambda k: int(ddrf_jobs[k]["finish time"])):
 		if jobid not in drf_jobs:
 			continue
+		#print jobid, drf_jobs[jobid]
 		percent_better = ( drf_jobs[jobid]["completion time"] - ddrf_jobs[jobid]["completion time"]) * 100.0 / float(drf_jobs[jobid]["completion time"])
+		#print "%s\t%d\t%.2f\t%.1f\t%.1f\t\t%d\t%d\t%d\t\t\t%d\t%d\t%d" % (jobid, ddrf_jobs[jobid]["numtasks"], percent_better , drf_jobs[jobid]["mem"], drf_jobs[jobid]["cpu"],  drf_jobs[jobid]["start time"], drf_jobs[jobid]["finish time"], drf_jobs[jobid]["completion time"], ddrf_jobs[jobid]["start time"], ddrf_jobs[jobid]["finish time"], ddrf_jobs[jobid]["completion time"])
 		bucket = getBucket(ddrf_jobs[jobid]["numtasks"])
 
 		better_bucket_wise[bucket].append(percent_better)
@@ -75,11 +79,11 @@ def compare(drffilename, ddrffilename):
 		num_jobs_completed_drf[bucket] += 1
 
 	   
-	print "Bucket , Mean % better (DDRF) , STD % better (DDRF ) , Num Jobs Completed (DRF) , Num Jobs Complted (DDRF)"
+	print "Bucket , Mean % better (DDRF) , MEDIAN % better (DDRF), STD % better (DDRF ) , Num Jobs Completed (DRF) , Num Jobs Complted (DDRF)"
 	for bucket in sorted(buckets):
 		if len(better_bucket_wise[bucket]) == 0:
 			continue
-		print "<=" + str(bucket) , numpy.mean(better_bucket_wise[bucket]) , numpy.std(better_bucket_wise[bucket]) , num_jobs_completed_drf[bucket],   num_jobs_completed_ddrf[bucket]
+		print "<=" + str(bucket) , numpy.mean(better_bucket_wise[bucket]) , numpy.median(better_bucket_wise[bucket]),  numpy.std(better_bucket_wise[bucket]) , num_jobs_completed_drf[bucket],   num_jobs_completed_ddrf[bucket]
 
 
 if __name__ == "__main__":
